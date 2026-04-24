@@ -105,25 +105,10 @@ export function App() {
     });
   };
 
-  const editBias = (layer: number, neuron: number, value: number) => {
-    setNetwork((prev) => {
-      const next = structuredClone(prev);
-      next.layers[layer].neurons[neuron].bias = value;
-      return next;
-    });
-  };
-
   const resetSelectedWeight = () => {
-    if (!selection) return;
-    if (selection.kind === 'edge') {
-      const n = network.layers[selection.layer].neurons[selection.neuron];
-      editWeight(selection.layer, selection.neuron, selection.weightIndex, n.initialWeights[selection.weightIndex]);
-    } else if (selection.layer > 0) {
-      // selection.layer is a positions index (0 = input). Bias lives at network.layers[layer-1].
-      const networkLayerIdx = selection.layer - 1;
-      const n = network.layers[networkLayerIdx].neurons[selection.neuron];
-      editBias(networkLayerIdx, selection.neuron, n.initialBias);
-    }
+    if (!selection || selection.kind !== 'edge') return;
+    const n = network.layers[selection.layer].neurons[selection.neuron];
+    editWeight(selection.layer, selection.neuron, selection.weightIndex, n.initialWeights[selection.weightIndex]);
   };
 
   const testInputs = useMemo(
@@ -454,12 +439,11 @@ export function App() {
             onBackgroundClick={() => setSelection(null)}
           />
 
-          {selection && (selection.kind === 'edge' || selection.layer > 0) && (
+          {selection && selection.kind === 'edge' && (
             <WeightEditor
               network={network}
               selection={selection}
               onWeightChange={editWeight}
-              onBiasChange={editBias}
               onReset={resetSelectedWeight}
               onClose={() => setSelection(null)}
             />
@@ -638,43 +622,33 @@ function WeightEditor({
   network,
   selection,
   onWeightChange,
-  onBiasChange,
   onReset,
   onClose,
 }: {
   network: Network;
-  selection: NonNullable<GraphSelection>;
+  selection: Extract<NonNullable<GraphSelection>, { kind: 'edge' }>;
   onWeightChange: (layer: number, neuron: number, weightIdx: number, v: number) => void;
-  onBiasChange: (layer: number, neuron: number, v: number) => void;
   onReset: () => void;
   onClose: () => void;
 }) {
-  const isEdge = selection.kind === 'edge';
-  // For edges: selection.layer is the network.layers index (0..N-1).
-  // For neurons: selection.layer is the positions index (0..N), so subtract 1
-  // to access network.layers[layer-1].
-  const networkLayerIdx = isEdge ? selection.layer : selection.layer - 1;
+  // selection.layer is the network.layers index (0..N-1).
+  const networkLayerIdx = selection.layer;
   const totalLayers = network.layers.length;
   const neuron = network.layers[networkLayerIdx].neurons[selection.neuron];
 
-  const currentValue = isEdge ? neuron.weights[selection.weightIndex] : neuron.bias;
-  const initialValue = isEdge
-    ? neuron.initialWeights[selection.weightIndex]
-    : neuron.initialBias;
+  const currentValue = neuron.weights[selection.weightIndex];
+  const initialValue = neuron.initialWeights[selection.weightIndex];
 
   const destLabel =
     networkLayerIdx === totalLayers - 1
       ? 'output'
       : `hidden ${networkLayerIdx + 1}, neuron ${selection.neuron + 1}`;
-  const sourceLabel = isEdge
-    ? networkLayerIdx === 0
+  const sourceLabel =
+    networkLayerIdx === 0
       ? `input ${selection.weightIndex + 1}`
-      : `hidden ${networkLayerIdx}, neuron ${selection.weightIndex + 1}`
-    : '';
+      : `hidden ${networkLayerIdx}, neuron ${selection.weightIndex + 1}`;
 
-  const title = isEdge
-    ? `Weight: ${sourceLabel} → ${destLabel}`
-    : `Bias: ${destLabel}`;
+  const title = `Weight: ${sourceLabel} → ${destLabel}`;
 
   return (
     <div
@@ -705,11 +679,7 @@ function WeightEditor({
           onChange={(e) => {
             const v = Number(e.target.value);
             if (Number.isNaN(v)) return;
-            if (isEdge) {
-              onWeightChange(networkLayerIdx, selection.neuron, selection.weightIndex, v);
-            } else {
-              onBiasChange(networkLayerIdx, selection.neuron, v);
-            }
+            onWeightChange(networkLayerIdx, selection.neuron, selection.weightIndex, v);
           }}
           style={{
             width: 90,
@@ -728,11 +698,7 @@ function WeightEditor({
         value={currentValue}
         onChange={(e) => {
           const v = Number(e.target.value);
-          if (isEdge) {
-            onWeightChange(networkLayerIdx, selection.neuron, selection.weightIndex, v);
-          } else {
-            onBiasChange(networkLayerIdx, selection.neuron, v);
-          }
+          onWeightChange(networkLayerIdx, selection.neuron, selection.weightIndex, v);
         }}
         style={{ width: 180 }}
       />
