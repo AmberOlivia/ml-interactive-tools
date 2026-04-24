@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Network, predict } from '../nn/network';
+import { Network, forward } from '../nn/network';
 import { computeFeatures, ConstantValues, FeatureName } from '../nn/features';
 import { DOMAIN, Sample, ProblemType } from '../datasets';
 
@@ -9,6 +9,9 @@ interface Props {
   constants: ConstantValues;
   samples: Sample[];
   problem: ProblemType;
+  // Which neuron's activation to render. layer = positions index (0 = input,
+  // last = output). null/undefined renders the network's final output.
+  target?: { layer: number; neuron: number } | null;
   size?: number;
   gridResolution?: number;
 }
@@ -40,6 +43,7 @@ export function OutputHeatmap({
   constants,
   samples,
   problem,
+  target,
   size = DEFAULT_SIZE,
   gridResolution = DEFAULT_RES,
 }: Props) {
@@ -63,7 +67,10 @@ export function OutputHeatmap({
         const x2 =
           DOMAIN.max - ((gy + 0.5) / gridResolution) * domainSpan;
         const inputs = computeFeatures(x1, x2, features, constants);
-        const out = predict(network, inputs);
+        const acts = forward(network, inputs);
+        const out = target
+          ? (acts[target.layer]?.[target.neuron] ?? 0)
+          : acts[acts.length - 1][0];
         const [r, g, b] = color(out);
         ctx.fillStyle = `rgb(${r},${g},${b})`;
         ctx.fillRect(gx * cellPx, gy * cellPx, cellPx + 1, cellPx + 1);
@@ -93,7 +100,7 @@ export function OutputHeatmap({
       ctx.fill();
       ctx.stroke();
     }
-  }, [network, features, constants, samples, problem, size, gridResolution]);
+  }, [network, features, constants, samples, problem, target, size, gridResolution]);
 
   return (
     <canvas

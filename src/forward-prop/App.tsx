@@ -118,9 +118,11 @@ export function App() {
     if (selection.kind === 'edge') {
       const n = network.layers[selection.layer].neurons[selection.neuron];
       editWeight(selection.layer, selection.neuron, selection.weightIndex, n.initialWeights[selection.weightIndex]);
-    } else {
-      const n = network.layers[selection.layer].neurons[selection.neuron];
-      editBias(selection.layer, selection.neuron, n.initialBias);
+    } else if (selection.layer > 0) {
+      // selection.layer is a positions index (0 = input). Bias lives at network.layers[layer-1].
+      const networkLayerIdx = selection.layer - 1;
+      const n = network.layers[networkLayerIdx].neurons[selection.neuron];
+      editBias(networkLayerIdx, selection.neuron, n.initialBias);
     }
   };
 
@@ -220,6 +222,30 @@ export function App() {
   };
 
   const output = layerActivations[layerActivations.length - 1][0];
+
+  // What neuron's heatmap to show in the big OutputHeatmap.
+  // Selection 'neuron' uses positions index directly. 'edge' promotes the
+  // destination neuron (layer + 1 in positions space) so students see what
+  // that edge contributes to.
+  const viewedTarget: { layer: number; neuron: number } | null = !selection
+    ? null
+    : selection.kind === 'neuron'
+      ? { layer: selection.layer, neuron: selection.neuron }
+      : { layer: selection.layer + 1, neuron: selection.neuron };
+
+  const viewedValueAtProbe = viewedTarget
+    ? (layerActivations[viewedTarget.layer]?.[viewedTarget.neuron] ?? 0)
+    : output;
+
+  const captionForTarget = (() => {
+    if (!viewedTarget) return 'Network output over input space — click to place probe';
+    if (viewedTarget.layer === 0) {
+      return `Input feature: ${FEATURES[features[viewedTarget.neuron]].label}`;
+    }
+    const last = layerActivations.length - 1;
+    if (viewedTarget.layer === last) return 'Output neuron';
+    return `Hidden layer ${viewedTarget.layer}, neuron ${viewedTarget.neuron + 1}`;
+  })();
 
   // Heatmap click handler — map pixel to domain coords
   const heatmapSize = 360;
@@ -423,12 +449,12 @@ export function App() {
               setSelection({ kind: 'edge', layer, neuron, weightIndex })
             }
             onNeuronClick={(layer, neuron) =>
-              setSelection({ kind: 'bias', layer, neuron })
+              setSelection({ kind: 'neuron', layer, neuron })
             }
             onBackgroundClick={() => setSelection(null)}
           />
 
-          {selection && (
+          {selection && (selection.kind === 'edge' || selection.layer > 0) && (
             <WeightEditor
               network={network}
               selection={selection}
@@ -441,8 +467,29 @@ export function App() {
 
           <div className="output-row">
             <div>
-              <div style={{ textAlign: 'center', fontSize: 12, color: '#64748b', marginBottom: 6 }}>
-                Network output over input space — click to place probe
+              <div
+                style={{
+                  textAlign: 'center',
+                  fontSize: 12,
+                  color: viewedTarget ? '#0f172a' : '#64748b',
+                  marginBottom: 6,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 10,
+                }}
+              >
+                <span style={{ fontWeight: viewedTarget ? 600 : 400 }}>
+                  Showing: {captionForTarget}
+                </span>
+                {viewedTarget && (
+                  <button
+                    onClick={() => setSelection(null)}
+                    style={{ padding: '2px 8px', fontSize: 11 }}
+                  >
+                    ← back to output
+                  </button>
+                )}
               </div>
               <div
                 style={{ cursor: 'crosshair', display: 'inline-block' }}
@@ -454,12 +501,13 @@ export function App() {
                   constants={constants}
                   samples={samples}
                   problem={problem}
+                  target={viewedTarget}
                 />
               </div>
               <TestInputMarker
                 testInput={testInput}
                 size={heatmapSize}
-                value={output}
+                value={viewedValueAtProbe}
               />
             </div>
           </div>
@@ -601,28 +649,32 @@ function WeightEditor({
   onReset: () => void;
   onClose: () => void;
 }) {
-  const layerCount = network.layers.length;
-  const neuron = network.layers[selection.layer].neurons[selection.neuron];
-
   const isEdge = selection.kind === 'edge';
+  // For edges: selection.layer is the network.layers index (0..N-1).
+  // For neurons: selection.layer is the positions index (0..N), so subtract 1
+  // to access network.layers[layer-1].
+  const networkLayerIdx = isEdge ? selection.layer : selection.layer - 1;
+  const totalLayers = network.layers.length;
+  const neuron = network.layers[networkLayerIdx].neurons[selection.neuron];
+
   const currentValue = isEdge ? neuron.weights[selection.weightIndex] : neuron.bias;
   const initialValue = isEdge
     ? neuron.initialWeights[selection.weightIndex]
     : neuron.initialBias;
 
-  const targetLayerLabel =
-    selection.layer === layerCount - 1
+  const destLabel =
+    networkLayerIdx === totalLayers - 1
       ? 'output'
-      : `hidden ${selection.layer + 1}, neuron ${selection.neuron + 1}`;
+      : `hidden ${networkLayerIdx + 1}, neuron ${selection.neuron + 1}`;
   const sourceLabel = isEdge
-    ? selection.layer === 0
+    ? networkLayerIdx === 0
       ? `input ${selection.weightIndex + 1}`
-      : `hidden ${selection.layer}, neuron ${selection.weightIndex + 1}`
+      : `hidden ${networkLayerIdx}, neuron ${selection.weightIndex + 1}`
     : '';
 
   const title = isEdge
-    ? `Weight: ${sourceLabel} → ${targetLayerLabel}`
-    : `Bias: ${targetLayerLabel}`;
+    ? `Weight: ${sourceLabel} → ${destLabel}`
+    : `Bias: ${destLabel}`;
 
   return (
     <div
@@ -654,9 +706,9 @@ function WeightEditor({
             const v = Number(e.target.value);
             if (Number.isNaN(v)) return;
             if (isEdge) {
-              onWeightChange(selection.layer, selection.neuron, selection.weightIndex, v);
+              onWeightChange(networkLayerIdx, selection.neuron, selection.weightIndex, v);
             } else {
-              onBiasChange(selection.layer, selection.neuron, v);
+              onBiasChange(networkLayerIdx, selection.neuron, v);
             }
           }}
           style={{
@@ -677,9 +729,9 @@ function WeightEditor({
         onChange={(e) => {
           const v = Number(e.target.value);
           if (isEdge) {
-            onWeightChange(selection.layer, selection.neuron, selection.weightIndex, v);
+            onWeightChange(networkLayerIdx, selection.neuron, selection.weightIndex, v);
           } else {
-            onBiasChange(selection.layer, selection.neuron, v);
+            onBiasChange(networkLayerIdx, selection.neuron, v);
           }
         }}
         style={{ width: 180 }}

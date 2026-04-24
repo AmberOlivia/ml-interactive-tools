@@ -2,9 +2,13 @@ import { useMemo } from 'react';
 import { Network, NetworkGrids } from '../nn/network';
 import { divergingColor, weightColor, weightWidth } from './colors';
 
+// Indexing convention:
+// - 'edge'   layer = network.layers index (0..N-1). Edge feeds positions[layer+1][neuron].
+// - 'neuron' layer = positions index (0..N). 0 = input layer. Bias lives at
+//            network.layers[layer-1].neurons[neuron] for layer > 0.
 export type GraphSelection =
   | { kind: 'edge'; layer: number; neuron: number; weightIndex: number }
-  | { kind: 'bias'; layer: number; neuron: number }
+  | { kind: 'neuron'; layer: number; neuron: number }
   | null;
 
 interface Props {
@@ -45,8 +49,8 @@ function edgeMatches(
   );
 }
 
-function biasMatches(s: GraphSelection, li: number, ni: number): boolean {
-  return !!s && s.kind === 'bias' && s.layer === li && s.neuron === ni;
+function neuronMatches(s: GraphSelection, li: number, ni: number): boolean {
+  return !!s && s.kind === 'neuron' && s.layer === li && s.neuron === ni;
 }
 
 function gridToDataUrl(grid: number[][]): string {
@@ -227,8 +231,7 @@ export function NetworkGraph({
             active && layerActivations ? (layerActivations[li]?.[ni] ?? 0) : 0;
           const isHovered =
             hovered && hovered.layer === li && hovered.neuron === ni;
-          const biasSelected = biasMatches(selection ?? null, li, ni);
-          const isInput = li === 0;
+          const neuronSelected = neuronMatches(selection ?? null, li, ni);
           const grid = grids?.[li]?.[ni] ?? null;
           return (
             <g
@@ -237,9 +240,9 @@ export function NetworkGraph({
               onMouseLeave={() => onNeuronLeave?.()}
               onClick={(e) => {
                 e.stopPropagation();
-                if (!isInput) onNeuronClick?.(li, ni);
+                onNeuronClick?.(li, ni);
               }}
-              style={{ cursor: onNeuronClick && !isInput ? 'pointer' : 'default' }}
+              style={{ cursor: onNeuronClick ? 'pointer' : 'default' }}
             >
               {/* clip the heatmap to the neuron tile */}
               <clipPath id={`tile-${li}-${ni}`}>
@@ -270,7 +273,7 @@ export function NetworkGraph({
                 ry={4}
                 fill="transparent"
                 stroke={
-                  biasSelected
+                  neuronSelected
                     ? '#0f172a'
                     : isHovered
                       ? '#0f172a'
@@ -278,8 +281,8 @@ export function NetworkGraph({
                         ? '#525252'
                         : '#a1a1aa'
                 }
-                strokeWidth={biasSelected || isHovered ? 2 : 1.25}
-                strokeDasharray={biasSelected ? '4 2' : undefined}
+                strokeWidth={neuronSelected || isHovered ? 2 : 1.25}
+                strokeDasharray={neuronSelected ? '4 2' : undefined}
               />
               {li === 0 && inputLabels[ni] && (
                 <text
