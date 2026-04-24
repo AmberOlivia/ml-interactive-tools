@@ -139,8 +139,12 @@ export function computeNeuronGrids(
       const x1 = domain.min + ((gx + 0.5) / resolution) * span;
       const inputs = inputBuilder(x1, x2);
       const acts = forward(net, inputs);
-      for (let li = 0; li < acts.length; li++) {
-        for (let ni = 0; ni < acts[li].length; ni++) {
+      // Guard against size mismatch: can happen for one render after feature
+      // count changes but before the network rebuild effect has fired.
+      const layerLimit = Math.min(acts.length, grids.length);
+      for (let li = 0; li < layerLimit; li++) {
+        const neuronLimit = Math.min(acts[li].length, grids[li].length);
+        for (let ni = 0; ni < neuronLimit; ni++) {
           grids[li][ni][gy][gx] = acts[li][ni];
         }
       }

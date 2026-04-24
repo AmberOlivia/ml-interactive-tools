@@ -11,8 +11,6 @@ import {
   FeatureName,
   FEATURES,
   computeFeatures,
-  CONSTANT_FEATURE_NAMES,
-  ConstantFeatureName,
   ConstantValues,
 } from '../shared/nn/features';
 import {
@@ -37,8 +35,9 @@ export function App() {
 
   // Features (input transformations)
   const [features, setFeatures] = useState<FeatureName[]>(['x1', 'x2']);
-  // Values for the constant (non-data-driven) inputs x3, x4, x5
-  const [constants, setConstants] = useState<ConstantValues>({ x3: 0, x4: 0, x5: 0 });
+  // x0 is the bias baseline input (= 1, per the course's "x0 = 1" convention).
+  // Not a user-adjustable value — its weights (θ₀) are what the student edits.
+  const [constants] = useState<ConstantValues>({ x0: 1 });
 
   // Architecture
   const [hiddenSizes, setHiddenSizes] = useState<number[]>([4, 2]);
@@ -355,7 +354,10 @@ export function App() {
           <div className="panel" style={{ marginTop: 16 }}>
             <h3>Input features</h3>
             <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
-              x₁, x₂ come from the data. x₃–x₅ are constants you set.
+              x₀ = 1 is the <b>bias baseline</b> (as in your course
+              notes). Its weights into the next layer act as θ₀. x₁, x₂
+              come from the data; the rest are engineered features built
+              from x₁ and x₂.
             </div>
             <div className="feature-grid">
               {FEATURE_NAMES.map((f) => (
@@ -369,25 +371,6 @@ export function App() {
                 </label>
               ))}
             </div>
-            {CONSTANT_FEATURE_NAMES.filter((f) => features.includes(f)).map(
-              (f) => (
-                <Slider
-                  key={f}
-                  label={`${FEATURES[f].label} value`}
-                  value={constants[f]}
-                  min={-3}
-                  max={3}
-                  step={0.1}
-                  format={(v) => v.toFixed(1)}
-                  onChange={(v) =>
-                    setConstants((prev) => ({
-                      ...prev,
-                      [f as ConstantFeatureName]: v,
-                    }))
-                  }
-                />
-              ),
-            )}
           </div>
         </div>
 
