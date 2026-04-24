@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Network } from '../nn/network';
+import { Network, NetworkGrids } from '../nn/network';
 import { divergingColor, weightColor, weightWidth } from './colors';
 
 export type GraphSelection =
@@ -10,21 +10,21 @@ export type GraphSelection =
 interface Props {
   network: Network;
   inputLabels: string[];
-  // Activations for each layer (from forward()): index 0 = inputs, last = output.
   layerActivations: number[][] | null;
-  // Which layers are "active" (already propagated). For step-forward animation.
   activeLayerIndex: number;
+  // Per-neuron activation grids over the 2D input domain. Used for mini-heatmaps.
+  grids: NetworkGrids | null;
   onNeuronHover?: (layer: number, neuron: number) => void;
   onNeuronLeave?: () => void;
   hovered?: { layer: number; neuron: number } | null;
-  // Click-to-edit
   selection?: GraphSelection;
   onEdgeClick?: (layer: number, neuron: number, weightIndex: number) => void;
   onNeuronClick?: (layer: number, neuron: number) => void;
   onBackgroundClick?: () => void;
 }
 
-const NEURON_R = 16;
+const NEURON_R = 16; // half-side of the square neuron tile
+const NEURON_SIZE = NEURON_R * 2;
 const WIDTH = 760;
 const HEIGHT = 340;
 const PAD_X = 80;
@@ -49,11 +49,72 @@ function biasMatches(s: GraphSelection, li: number, ni: number): boolean {
   return !!s && s.kind === 'bias' && s.layer === li && s.neuron === ni;
 }
 
+function gridToDataUrl(grid: number[][]): string {
+  const res = grid.length;
+  const canvas = document.createElement('canvas');
+  canvas.width = res;
+  canvas.height = res;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+  for (let gy = 0; gy < res; gy++) {
+    for (let gx = 0; gx < res; gx++) {
+      ctx.fillStyle = divergingColor(grid[gy][gx]);
+      ctx.fillRect(gx, gy, 1, 1);
+    }
+  }
+  return canvas.toDataURL();
+}
+
+// One mini heatmap as an SVG <image>. Memoizes the data URL on grid identity.
+function NeuronTile({
+  x,
+  y,
+  size,
+  grid,
+  visible,
+}: {
+  x: number;
+  y: number;
+  size: number;
+  grid: number[][] | null;
+  visible: boolean;
+}) {
+  const dataUrl = useMemo(
+    () => (grid ? gridToDataUrl(grid) : ''),
+    [grid],
+  );
+  if (!visible || !grid) {
+    return (
+      <rect
+        x={x}
+        y={y}
+        width={size}
+        height={size}
+        fill="#ffffff"
+        pointerEvents="none"
+      />
+    );
+  }
+  return (
+    <image
+      href={dataUrl}
+      x={x}
+      y={y}
+      width={size}
+      height={size}
+      preserveAspectRatio="none"
+      style={{ imageRendering: 'pixelated' }}
+      pointerEvents="none"
+    />
+  );
+}
+
 export function NetworkGraph({
   network,
   inputLabels,
   layerActivations,
   activeLayerIndex,
+  grids,
   onNeuronHover,
   onNeuronLeave,
   hovered,
@@ -97,15 +158,13 @@ export function NetworkGraph({
       height={HEIGHT}
       viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
       onClick={(e) => {
-        // Only fire background-click when the svg itself was clicked,
-        // not bubbled from a child group.
         if (e.target === e.currentTarget) onBackgroundClick?.();
       }}
       style={{ background: '#fafafa', borderRadius: 8, border: '1px solid #e5e7eb' }}
     >
-      {/* Edges: layer l-1 → l (l from 1..layers.length) */}
+      {/* Edges */}
       {network.layers.map((layer, li) => {
-        const fromLayerIdx = li; // positions index of previous layer (inputs are index 0)
+        const fromLayerIdx = li;
         const toLayerIdx = li + 1;
         const edgesActive = activeLayerIndex >= toLayerIdx;
         return (
@@ -124,7 +183,6 @@ export function NetworkGraph({
                     }}
                     style={{ cursor: onEdgeClick ? 'pointer' : 'default' }}
                   >
-                    {/* Invisible wider hit target */}
                     <line
                       x1={from.x + NEURON_R}
                       y1={from.y}
@@ -167,11 +225,11 @@ export function NetworkGraph({
           const active = activeLayerIndex >= li;
           const activation =
             active && layerActivations ? (layerActivations[li]?.[ni] ?? 0) : 0;
-          const fill = active ? divergingColor(activation) : '#ffffff';
           const isHovered =
             hovered && hovered.layer === li && hovered.neuron === ni;
           const biasSelected = biasMatches(selection ?? null, li, ni);
           const isInput = li === 0;
+          const grid = grids?.[li]?.[ni] ?? null;
           return (
             <g
               key={`n-${li}-${ni}`}
@@ -183,11 +241,34 @@ export function NetworkGraph({
               }}
               style={{ cursor: onNeuronClick && !isInput ? 'pointer' : 'default' }}
             >
-              <circle
-                cx={pos.x}
-                cy={pos.y}
-                r={NEURON_R}
-                fill={fill}
+              {/* clip the heatmap to the neuron tile */}
+              <clipPath id={`tile-${li}-${ni}`}>
+                <rect
+                  x={pos.x - NEURON_R}
+                  y={pos.y - NEURON_R}
+                  width={NEURON_SIZE}
+                  height={NEURON_SIZE}
+                  rx={4}
+                  ry={4}
+                />
+              </clipPath>
+              <g clipPath={`url(#tile-${li}-${ni})`}>
+                <NeuronTile
+                  x={pos.x - NEURON_R}
+                  y={pos.y - NEURON_R}
+                  size={NEURON_SIZE}
+                  grid={grid}
+                  visible={active}
+                />
+              </g>
+              <rect
+                x={pos.x - NEURON_R}
+                y={pos.y - NEURON_R}
+                width={NEURON_SIZE}
+                height={NEURON_SIZE}
+                rx={4}
+                ry={4}
+                fill="transparent"
                 stroke={
                   biasSelected
                     ? '#0f172a'
@@ -197,7 +278,7 @@ export function NetworkGraph({
                         ? '#525252'
                         : '#a1a1aa'
                 }
-                strokeWidth={biasSelected ? 3 : isHovered ? 3 : 1.5}
+                strokeWidth={biasSelected || isHovered ? 2 : 1.25}
                 strokeDasharray={biasSelected ? '4 2' : undefined}
               />
               {li === 0 && inputLabels[ni] && (
@@ -217,7 +298,11 @@ export function NetworkGraph({
                   y={pos.y + 4}
                   textAnchor="middle"
                   fontSize={10}
-                  fill={Math.abs(activation) > 0.6 ? '#fff' : '#1f2937'}
+                  fontWeight={600}
+                  fill={Math.abs(activation) > 0.4 ? '#fff' : '#0f172a'}
+                  stroke={Math.abs(activation) > 0.4 ? '#0f172a' : '#ffffff'}
+                  strokeWidth={0.4}
+                  paintOrder="stroke"
                   style={{ pointerEvents: 'none' }}
                 >
                   {activation.toFixed(2)}

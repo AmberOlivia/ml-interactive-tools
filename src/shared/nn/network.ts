@@ -109,3 +109,42 @@ export function getShape(net: Network): NetworkShape {
     layerSizes: [net.inputSize, ...net.layers.map((l) => l.neurons.length)],
   };
 }
+
+// Per-neuron activation over a 2D grid of inputs — used to render
+// "mini-heatmaps" inside each neuron (Playground-style).
+// Shape: grids[layer][neuron][gy][gx]
+// Layer 0 = inputs; last = output.
+export type NeuronGrid = number[][];
+export type NetworkGrids = NeuronGrid[][];
+
+// Compute each neuron's activation over a 2D grid of input points.
+// `inputBuilder(x1, x2)` returns the input vector for domain point (x1, x2) —
+// the caller decides how features and constants map to inputs.
+export function computeNeuronGrids(
+  net: Network,
+  inputBuilder: (x1: number, x2: number) => number[],
+  domain: { min: number; max: number },
+  resolution: number,
+): NetworkGrids {
+  const layerSizes = [net.inputSize, ...net.layers.map((l) => l.neurons.length)];
+  const grids: NetworkGrids = layerSizes.map((size) =>
+    Array.from({ length: size }, () =>
+      Array.from({ length: resolution }, () => new Array(resolution).fill(0)),
+    ),
+  );
+  const span = domain.max - domain.min;
+  for (let gy = 0; gy < resolution; gy++) {
+    const x2 = domain.max - ((gy + 0.5) / resolution) * span;
+    for (let gx = 0; gx < resolution; gx++) {
+      const x1 = domain.min + ((gx + 0.5) / resolution) * span;
+      const inputs = inputBuilder(x1, x2);
+      const acts = forward(net, inputs);
+      for (let li = 0; li < acts.length; li++) {
+        for (let ni = 0; ni < acts[li].length; ni++) {
+          grids[li][ni][gy][gx] = acts[li][ni];
+        }
+      }
+    }
+  }
+  return grids;
+}

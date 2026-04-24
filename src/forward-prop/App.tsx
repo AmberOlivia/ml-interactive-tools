@@ -1,5 +1,10 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { buildNetwork, forward, Network } from '../shared/nn/network';
+import {
+  buildNetwork,
+  computeNeuronGrids,
+  forward,
+  Network,
+} from '../shared/nn/network';
 import { ACTIVATION_NAMES, ActivationName } from '../shared/nn/activations';
 import {
   FEATURE_NAMES,
@@ -124,9 +129,24 @@ export function App() {
     [testInput, features, constants],
   );
 
+  // Per-neuron activation grids — used for mini heatmaps inside each neuron.
+  // Computed first (it mutates z/a during the grid sweep), then forward()
+  // runs again on the test input to leave the network in the probe state.
+  const grids = useMemo(
+    () =>
+      computeNeuronGrids(
+        network,
+        (x1, x2) => computeFeatures(x1, x2, features, constants),
+        DOMAIN,
+        20,
+      ),
+    [network, features, constants],
+  );
+
   const layerActivations = useMemo(
     () => forward(network, testInputs),
-    [network, testInputs],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [network, testInputs, grids],
   );
 
   const maxLayerIndex = layerActivations.length - 1;
@@ -394,6 +414,7 @@ export function App() {
             inputLabels={inputLabels}
             layerActivations={layerActivations}
             activeLayerIndex={activeLayer}
+            grids={grids}
             onNeuronHover={(l, n) => setHovered({ layer: l, neuron: n })}
             onNeuronLeave={() => setHovered(null)}
             hovered={hovered}
