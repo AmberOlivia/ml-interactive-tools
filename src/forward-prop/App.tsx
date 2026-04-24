@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { buildNetwork, forward } from '../shared/nn/network';
+import { buildNetwork, forward, Network } from '../shared/nn/network';
 import { ACTIVATION_NAMES, ActivationName } from '../shared/nn/activations';
 import {
   FEATURE_NAMES,
@@ -17,7 +17,7 @@ import {
   ProblemType,
   DOMAIN,
 } from '../shared/datasets';
-import { NetworkGraph } from '../shared/viz/NetworkGraph';
+import { NetworkGraph, GraphSelection } from '../shared/viz/NetworkGraph';
 import { OutputHeatmap } from '../shared/viz/OutputHeatmap';
 import { Slider } from '../shared/ui/Slider';
 import { divergingColor } from '../shared/viz/colors';
@@ -66,8 +66,21 @@ export function App() {
     [datasetName, noise, dataSeed, problem],
   );
 
-  const network = useMemo(
-    () =>
+  // Network lives in state so users can click-to-edit weights and biases.
+  // It gets rebuilt when architecture or seed changes.
+  const [network, setNetwork] = useState<Network>(() =>
+    buildNetwork({
+      inputSize: features.length,
+      hiddenSizes,
+      hiddenActivation,
+      outputActivation,
+      seed: weightSeed,
+    }),
+  );
+  const [selection, setSelection] = useState<GraphSelection>(null);
+
+  useEffect(() => {
+    setNetwork(
       buildNetwork({
         inputSize: features.length,
         hiddenSizes,
@@ -75,8 +88,36 @@ export function App() {
         outputActivation,
         seed: weightSeed,
       }),
-    [features.length, hiddenSizes, hiddenActivation, outputActivation, weightSeed],
-  );
+    );
+    setSelection(null);
+  }, [features.length, hiddenSizes, hiddenActivation, outputActivation, weightSeed]);
+
+  const editWeight = (layer: number, neuron: number, weightIdx: number, value: number) => {
+    setNetwork((prev) => {
+      const next = structuredClone(prev);
+      next.layers[layer].neurons[neuron].weights[weightIdx] = value;
+      return next;
+    });
+  };
+
+  const editBias = (layer: number, neuron: number, value: number) => {
+    setNetwork((prev) => {
+      const next = structuredClone(prev);
+      next.layers[layer].neurons[neuron].bias = value;
+      return next;
+    });
+  };
+
+  const resetSelectedWeight = () => {
+    if (!selection) return;
+    if (selection.kind === 'edge') {
+      const n = network.layers[selection.layer].neurons[selection.neuron];
+      editWeight(selection.layer, selection.neuron, selection.weightIndex, n.initialWeights[selection.weightIndex]);
+    } else {
+      const n = network.layers[selection.layer].neurons[selection.neuron];
+      editBias(selection.layer, selection.neuron, n.initialBias);
+    }
+  };
 
   const testInputs = useMemo(
     () => computeFeatures(testInput[0], testInput[1], features, constants),
@@ -356,7 +397,26 @@ export function App() {
             onNeuronHover={(l, n) => setHovered({ layer: l, neuron: n })}
             onNeuronLeave={() => setHovered(null)}
             hovered={hovered}
+            selection={selection}
+            onEdgeClick={(layer, neuron, weightIndex) =>
+              setSelection({ kind: 'edge', layer, neuron, weightIndex })
+            }
+            onNeuronClick={(layer, neuron) =>
+              setSelection({ kind: 'bias', layer, neuron })
+            }
+            onBackgroundClick={() => setSelection(null)}
           />
+
+          {selection && (
+            <WeightEditor
+              network={network}
+              selection={selection}
+              onWeightChange={editWeight}
+              onBiasChange={editBias}
+              onReset={resetSelectedWeight}
+              onClose={() => setSelection(null)}
+            />
+          )}
 
           <div className="output-row">
             <div>
@@ -501,6 +561,110 @@ export function App() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function WeightEditor({
+  network,
+  selection,
+  onWeightChange,
+  onBiasChange,
+  onReset,
+  onClose,
+}: {
+  network: Network;
+  selection: NonNullable<GraphSelection>;
+  onWeightChange: (layer: number, neuron: number, weightIdx: number, v: number) => void;
+  onBiasChange: (layer: number, neuron: number, v: number) => void;
+  onReset: () => void;
+  onClose: () => void;
+}) {
+  const layerCount = network.layers.length;
+  const neuron = network.layers[selection.layer].neurons[selection.neuron];
+
+  const isEdge = selection.kind === 'edge';
+  const currentValue = isEdge ? neuron.weights[selection.weightIndex] : neuron.bias;
+  const initialValue = isEdge
+    ? neuron.initialWeights[selection.weightIndex]
+    : neuron.initialBias;
+
+  const targetLayerLabel =
+    selection.layer === layerCount - 1
+      ? 'output'
+      : `hidden ${selection.layer + 1}, neuron ${selection.neuron + 1}`;
+  const sourceLabel = isEdge
+    ? selection.layer === 0
+      ? `input ${selection.weightIndex + 1}`
+      : `hidden ${selection.layer}, neuron ${selection.weightIndex + 1}`
+    : '';
+
+  const title = isEdge
+    ? `Weight: ${sourceLabel} → ${targetLayerLabel}`
+    : `Bias: ${targetLayerLabel}`;
+
+  return (
+    <div
+      style={{
+        width: 760,
+        padding: '10px 14px',
+        border: '1px solid #0f172a',
+        borderRadius: 8,
+        background: '#f1f5f9',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        fontSize: 13,
+      }}
+    >
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 600 }}>{title}</div>
+        <div style={{ color: '#64748b', fontSize: 11 }}>
+          initial: {initialValue.toFixed(3)}
+        </div>
+      </div>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        value
+        <input
+          type="number"
+          step={0.05}
+          value={Number(currentValue.toFixed(4))}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            if (Number.isNaN(v)) return;
+            if (isEdge) {
+              onWeightChange(selection.layer, selection.neuron, selection.weightIndex, v);
+            } else {
+              onBiasChange(selection.layer, selection.neuron, v);
+            }
+          }}
+          style={{
+            width: 90,
+            padding: '4px 6px',
+            border: '1px solid #cbd5e1',
+            borderRadius: 4,
+            fontFamily: 'ui-monospace, monospace',
+          }}
+        />
+      </label>
+      <input
+        type="range"
+        min={-3}
+        max={3}
+        step={0.01}
+        value={currentValue}
+        onChange={(e) => {
+          const v = Number(e.target.value);
+          if (isEdge) {
+            onWeightChange(selection.layer, selection.neuron, selection.weightIndex, v);
+          } else {
+            onBiasChange(selection.layer, selection.neuron, v);
+          }
+        }}
+        style={{ width: 180 }}
+      />
+      <button onClick={onReset}>⟲ reset</button>
+      <button onClick={onClose}>× close</button>
     </div>
   );
 }

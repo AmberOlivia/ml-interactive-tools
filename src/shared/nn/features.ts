@@ -1,22 +1,51 @@
-export type FeatureName = 'x1' | 'x2' | 'x3' | 'x4' | 'x5';
+export type FeatureName =
+  | 'x1'
+  | 'x2'
+  | 'x1Squared'
+  | 'x2Squared'
+  | 'x1x2'
+  | 'sinX1'
+  | 'sinX2'
+  | 'x3'
+  | 'x4'
+  | 'x5';
+
 export type ConstantFeatureName = 'x3' | 'x4' | 'x5';
 
 export interface Feature {
   name: FeatureName;
   label: string;
-  // True for x1/x2 (data-driven); false for x3/x4/x5 (user-set constant)
+  // True: derived from the data (x1, x2, and engineered features).
+  // False: user-set constant (x3, x4, x5).
   isDataDriven: boolean;
 }
 
 export const FEATURES: Record<FeatureName, Feature> = {
   x1: { name: 'x1', label: 'x₁', isDataDriven: true },
   x2: { name: 'x2', label: 'x₂', isDataDriven: true },
+  x1Squared: { name: 'x1Squared', label: 'x₁²', isDataDriven: true },
+  x2Squared: { name: 'x2Squared', label: 'x₂²', isDataDriven: true },
+  x1x2: { name: 'x1x2', label: 'x₁x₂', isDataDriven: true },
+  sinX1: { name: 'sinX1', label: 'sin(x₁)', isDataDriven: true },
+  sinX2: { name: 'sinX2', label: 'sin(x₂)', isDataDriven: true },
   x3: { name: 'x3', label: 'x₃', isDataDriven: false },
   x4: { name: 'x4', label: 'x₄', isDataDriven: false },
   x5: { name: 'x5', label: 'x₅', isDataDriven: false },
 };
 
-export const FEATURE_NAMES: FeatureName[] = ['x1', 'x2', 'x3', 'x4', 'x5'];
+export const FEATURE_NAMES: FeatureName[] = [
+  'x1',
+  'x2',
+  'x1Squared',
+  'x2Squared',
+  'x1x2',
+  'sinX1',
+  'sinX2',
+  'x3',
+  'x4',
+  'x5',
+];
+
 export const CONSTANT_FEATURE_NAMES: ConstantFeatureName[] = ['x3', 'x4', 'x5'];
 
 export type ConstantValues = Record<ConstantFeatureName, number>;
@@ -28,8 +57,23 @@ export function computeFeatures(
   constants: ConstantValues,
 ): number[] {
   return selected.map((n) => {
-    if (n === 'x1') return x1;
-    if (n === 'x2') return x2;
-    return constants[n];
+    switch (n) {
+      case 'x1':
+        return x1;
+      case 'x2':
+        return x2;
+      case 'x1Squared':
+        return x1 * x1;
+      case 'x2Squared':
+        return x2 * x2;
+      case 'x1x2':
+        return x1 * x2;
+      case 'sinX1':
+        return Math.sin(x1);
+      case 'sinX2':
+        return Math.sin(x2);
+      default:
+        return constants[n];
+    }
   });
 }

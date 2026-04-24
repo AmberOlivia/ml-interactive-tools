@@ -2,17 +2,26 @@ import { useMemo } from 'react';
 import { Network } from '../nn/network';
 import { divergingColor, weightColor, weightWidth } from './colors';
 
+export type GraphSelection =
+  | { kind: 'edge'; layer: number; neuron: number; weightIndex: number }
+  | { kind: 'bias'; layer: number; neuron: number }
+  | null;
+
 interface Props {
   network: Network;
   inputLabels: string[];
   // Activations for each layer (from forward()): index 0 = inputs, last = output.
   layerActivations: number[][] | null;
   // Which layers are "active" (already propagated). For step-forward animation.
-  // e.g. activeLayerIndex=0 means only the input layer is active.
   activeLayerIndex: number;
   onNeuronHover?: (layer: number, neuron: number) => void;
   onNeuronLeave?: () => void;
   hovered?: { layer: number; neuron: number } | null;
+  // Click-to-edit
+  selection?: GraphSelection;
+  onEdgeClick?: (layer: number, neuron: number, weightIndex: number) => void;
+  onNeuronClick?: (layer: number, neuron: number) => void;
+  onBackgroundClick?: () => void;
 }
 
 const NEURON_R = 16;
@@ -20,6 +29,25 @@ const WIDTH = 760;
 const HEIGHT = 340;
 const PAD_X = 80;
 const PAD_Y = 28;
+
+function edgeMatches(
+  s: GraphSelection,
+  li: number,
+  ni: number,
+  wi: number,
+): boolean {
+  return (
+    !!s &&
+    s.kind === 'edge' &&
+    s.layer === li &&
+    s.neuron === ni &&
+    s.weightIndex === wi
+  );
+}
+
+function biasMatches(s: GraphSelection, li: number, ni: number): boolean {
+  return !!s && s.kind === 'bias' && s.layer === li && s.neuron === ni;
+}
 
 export function NetworkGraph({
   network,
@@ -29,6 +57,10 @@ export function NetworkGraph({
   onNeuronHover,
   onNeuronLeave,
   hovered,
+  selection,
+  onEdgeClick,
+  onNeuronClick,
+  onBackgroundClick,
 }: Props) {
   const layerSizes = useMemo(
     () => [network.inputSize, ...network.layers.map((l) => l.neurons.length)],
@@ -64,6 +96,11 @@ export function NetworkGraph({
       width={WIDTH}
       height={HEIGHT}
       viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+      onClick={(e) => {
+        // Only fire background-click when the svg itself was clicked,
+        // not bubbled from a child group.
+        if (e.target === e.currentTarget) onBackgroundClick?.();
+      }}
       style={{ background: '#fafafa', borderRadius: 8, border: '1px solid #e5e7eb' }}
     >
       {/* Edges: layer l-1 → l (l from 1..layers.length) */}
@@ -77,17 +114,46 @@ export function NetworkGraph({
               neuron.weights.map((w, wi) => {
                 const from = positions[fromLayerIdx][wi];
                 const to = positions[toLayerIdx][ni];
+                const selected = edgeMatches(selection ?? null, li, ni, wi);
                 return (
-                  <line
+                  <g
                     key={`${li}-${ni}-${wi}`}
-                    x1={from.x + NEURON_R}
-                    y1={from.y}
-                    x2={to.x - NEURON_R}
-                    y2={to.y}
-                    stroke={edgesActive ? weightColor(w) : '#d4d4d8'}
-                    strokeWidth={weightWidth(w, maxAbsWeight)}
-                    opacity={edgesActive ? 0.9 : 0.25}
-                  />
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdgeClick?.(li, ni, wi);
+                    }}
+                    style={{ cursor: onEdgeClick ? 'pointer' : 'default' }}
+                  >
+                    {/* Invisible wider hit target */}
+                    <line
+                      x1={from.x + NEURON_R}
+                      y1={from.y}
+                      x2={to.x - NEURON_R}
+                      y2={to.y}
+                      stroke="transparent"
+                      strokeWidth={10}
+                    />
+                    <line
+                      x1={from.x + NEURON_R}
+                      y1={from.y}
+                      x2={to.x - NEURON_R}
+                      y2={to.y}
+                      stroke={
+                        selected
+                          ? '#0f172a'
+                          : edgesActive
+                            ? weightColor(w)
+                            : '#d4d4d8'
+                      }
+                      strokeWidth={
+                        selected
+                          ? Math.max(3, weightWidth(w, maxAbsWeight) + 1.5)
+                          : weightWidth(w, maxAbsWeight)
+                      }
+                      opacity={edgesActive || selected ? 0.95 : 0.25}
+                      strokeDasharray={selected ? '6 3' : undefined}
+                    />
+                  </g>
                 );
               }),
             )}
@@ -100,31 +166,46 @@ export function NetworkGraph({
         layer.map((pos, ni) => {
           const active = activeLayerIndex >= li;
           const activation =
-            active && layerActivations ? layerActivations[li]?.[ni] ?? 0 : 0;
+            active && layerActivations ? (layerActivations[li]?.[ni] ?? 0) : 0;
           const fill = active ? divergingColor(activation) : '#ffffff';
           const isHovered =
             hovered && hovered.layer === li && hovered.neuron === ni;
+          const biasSelected = biasMatches(selection ?? null, li, ni);
+          const isInput = li === 0;
           return (
             <g
               key={`n-${li}-${ni}`}
               onMouseEnter={() => onNeuronHover?.(li, ni)}
               onMouseLeave={() => onNeuronLeave?.()}
-              style={{ cursor: 'pointer' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!isInput) onNeuronClick?.(li, ni);
+              }}
+              style={{ cursor: onNeuronClick && !isInput ? 'pointer' : 'default' }}
             >
               <circle
                 cx={pos.x}
                 cy={pos.y}
                 r={NEURON_R}
                 fill={fill}
-                stroke={isHovered ? '#0f172a' : active ? '#525252' : '#a1a1aa'}
-                strokeWidth={isHovered ? 3 : 1.5}
+                stroke={
+                  biasSelected
+                    ? '#0f172a'
+                    : isHovered
+                      ? '#0f172a'
+                      : active
+                        ? '#525252'
+                        : '#a1a1aa'
+                }
+                strokeWidth={biasSelected ? 3 : isHovered ? 3 : 1.5}
+                strokeDasharray={biasSelected ? '4 2' : undefined}
               />
               {li === 0 && inputLabels[ni] && (
                 <text
                   x={pos.x - NEURON_R - 8}
                   y={pos.y + 4}
                   textAnchor="end"
-                  fontSize={13}
+                  fontSize={12}
                   fill="#334155"
                 >
                   {inputLabels[ni]}
@@ -137,6 +218,7 @@ export function NetworkGraph({
                   textAnchor="middle"
                   fontSize={10}
                   fill={Math.abs(activation) > 0.6 ? '#fff' : '#1f2937'}
+                  style={{ pointerEvents: 'none' }}
                 >
                   {activation.toFixed(2)}
                 </text>

@@ -6,6 +6,9 @@ export interface Neuron {
   weights: number[]; // length = previous layer size
   z: number; // pre-activation
   a: number; // post-activation
+  // Captured at build time so the UI can offer "reset to initial"
+  initialBias: number;
+  initialWeights: number[];
 }
 
 export interface Layer {
@@ -49,6 +52,8 @@ export function buildNetwork(opts: BuildOptions): Network {
         weights,
         z: 0,
         a: 0,
+        initialBias: 0,
+        initialWeights: weights.slice(),
       });
     }
     layers.push({
