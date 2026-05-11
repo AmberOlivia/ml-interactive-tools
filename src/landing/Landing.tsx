@@ -13,6 +13,14 @@ export function Landing() {
         </p>
       </a>
 
+      <a className="tool-card" href="./forward-prop-narrow.html">
+        <h2>1b · Forward Propagation (narrow) →</h2>
+        <p>
+          Single-column layout meant for embedding in Canvas or other narrow
+          iframes — same tool, no horizontal scrolling.
+        </p>
+      </a>
+
       <a className="tool-card disabled" href="./backprop.html">
         <h2>2 · Backpropagation (coming soon)</h2>
         <p>

@@ -302,3 +302,149 @@ button.primary:hover:not(:disabled) {
   color: var(--muted);
   font-size: 14px;
 }
+
+/* ---------- Narrow / single-column layout (Canvas embed) ---------- */
+.narrow-shell {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.narrow-header {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+
+.narrow-header h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.narrow-subtitle {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.narrow-intro {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.narrow-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+
+.narrow-buttons button {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.narrow-step-indicator {
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.narrow-graph {
+  width: 100%;
+}
+
+.narrow-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.narrow-caption {
+  font-size: 12px;
+  color: var(--text);
+  text-align: center;
+}
+
+.narrow-legend {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.narrow-panel {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.narrow-panel summary {
+  cursor: pointer;
+  padding: 10px 14px;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+  user-select: none;
+  list-style: none;
+}
+
+.narrow-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.narrow-panel summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 8px;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.narrow-panel[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.narrow-panel-body {
+  padding: 0 14px 14px 14px;
+}
+
+.narrow-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid #0f172a;
+  border-radius: 8px;
+  background: #f1f5f9;
+}
+
+.narrow-editor-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.narrow-footer {
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.narrow-footer a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.narrow-footer a:hover {
+  text-decoration: underline;
+}

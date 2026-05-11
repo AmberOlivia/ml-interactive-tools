@@ -25,6 +25,8 @@ interface Props {
   onEdgeClick?: (layer: number, neuron: number, weightIndex: number) => void;
   onNeuronClick?: (layer: number, neuron: number) => void;
   onBackgroundClick?: () => void;
+  // When true, the SVG scales down to fit its container (used in narrow layouts).
+  responsive?: boolean;
 }
 
 const NEURON_R = 16; // half-side of the square neuron tile
@@ -126,6 +128,7 @@ export function NetworkGraph({
   onEdgeClick,
   onNeuronClick,
   onBackgroundClick,
+  responsive,
 }: Props) {
   const layerSizes = useMemo(
     () => [network.inputSize, ...network.layers.map((l) => l.neurons.length)],
@@ -158,13 +161,19 @@ export function NetworkGraph({
 
   return (
     <svg
-      width={WIDTH}
-      height={HEIGHT}
+      width={responsive ? '100%' : WIDTH}
+      height={responsive ? undefined : HEIGHT}
       viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+      preserveAspectRatio="xMidYMid meet"
       onClick={(e) => {
         if (e.target === e.currentTarget) onBackgroundClick?.();
       }}
-      style={{ background: '#fafafa', borderRadius: 8, border: '1px solid #e5e7eb' }}
+      style={{
+        background: '#fafafa',
+        borderRadius: 8,
+        border: '1px solid #e5e7eb',
+        ...(responsive ? { maxWidth: '100%', height: 'auto', display: 'block' } : {}),
+      }}
     >
       {/* Edges */}
       {network.layers.map((layer, li) => {

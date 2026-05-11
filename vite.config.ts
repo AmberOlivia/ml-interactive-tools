@@ -18,6 +18,7 @@ export default defineConfig({
       input: {
         index: resolve(__dirname, 'index.html'),
         'forward-prop': resolve(__dirname, 'forward-prop.html'),
+        'forward-prop-narrow': resolve(__dirname, 'forward-prop-narrow.html'),
         backprop: resolve(__dirname, 'backprop.html'),
       },
     },
