@@ -271,22 +271,22 @@ export function App() {
 
       {/* Step controls */}
       <div className="narrow-buttons">
-        <button onClick={handleReset} disabled={activeLayer === 0}>⟲</button>
-        <button onClick={handleStepBack} disabled={activeLayer === 0}>←</button>
+        <button onClick={handleReset} disabled={activeLayer === 0}>⟲ Reset</button>
+        <button onClick={handleStepBack} disabled={activeLayer === 0}>← Step back</button>
         <button
           className="primary"
           onClick={handleStep}
           disabled={activeLayer >= maxLayerIndex}
         >
-          Step → ({activeLayer}/{maxLayerIndex})
+          Step → (layer {activeLayer} → {Math.min(activeLayer + 1, maxLayerIndex)})
         </button>
-        <button onClick={handlePlay} disabled={playing}>▶</button>
-        <button onClick={handleFull} disabled={activeLayer >= maxLayerIndex}>⇥</button>
+        <button onClick={handlePlay} disabled={playing}>▶ Play</button>
+        <button onClick={handleFull} disabled={activeLayer >= maxLayerIndex}>⇥ Full pass</button>
       </div>
       <div className="narrow-step-indicator">
         {activeLayer === maxLayerIndex
           ? `Complete · output ŷ = ${output.toFixed(3)}`
-          : `Layer ${activeLayer} of ${maxLayerIndex}`}
+          : `Showing layer ${activeLayer} of ${maxLayerIndex}`}
       </div>
 
       {/* Network graph (responsive) */}
@@ -322,6 +322,32 @@ export function App() {
           onClose={() => setSelection(null)}
         />
       )}
+
+      {/* Neuron inspector — always visible right under the graph */}
+      <div className="narrow-inspector-box">
+        <div className="narrow-inspector-header">Neuron inspector</div>
+        {inspector ? (
+          <div className="neuron-inspector">
+            <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 13 }}>
+              {inspector.title}
+            </div>
+            <table>
+              <tbody>
+                {inspector.rows.map(([k, v], i) => (
+                  <tr key={i}>
+                    <td>{k}</td>
+                    <td>{v}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div style={{ color: '#94a3b8', fontSize: 12 }}>
+            Hover a neuron in the graph above to see its weights and computation.
+          </div>
+        )}
+      </div>
 
       {/* Heatmap */}
       <div className="narrow-section">
@@ -477,33 +503,6 @@ export function App() {
           >
             🎲 Reshuffle weights
           </button>
-        </div>
-      </details>
-
-      <details className="narrow-panel">
-        <summary>Neuron inspector{hovered ? ' · hovering' : ''}</summary>
-        <div className="narrow-panel-body">
-          {inspector ? (
-            <div className="neuron-inspector">
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>
-                {inspector.title}
-              </div>
-              <table>
-                <tbody>
-                  {inspector.rows.map(([k, v], i) => (
-                    <tr key={i}>
-                      <td>{k}</td>
-                      <td>{v}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div style={{ color: '#94a3b8', fontSize: 13 }}>
-              Hover a neuron in the graph above to inspect its weights.
-            </div>
-          )}
         </div>
       </details>
 
