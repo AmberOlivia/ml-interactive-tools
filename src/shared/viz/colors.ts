@@ -27,5 +27,7 @@ export function weightColor(w: number): string {
 
 export function weightWidth(w: number, maxAbs: number): number {
   const normalized = maxAbs > 0 ? Math.abs(w) / maxAbs : 0;
-  return 0.5 + normalized * 3.5;
+  // Floor at 1.5px so even the smallest weight remains clearly visible,
+  // then scale up to 5px for the largest weight.
+  return 1.5 + normalized * 3.5;
 }
