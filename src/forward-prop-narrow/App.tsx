@@ -239,6 +239,7 @@ export function App() {
     const prevAct = layerActivations[layer - 1];
     const active = activeLayer >= layer;
     const rows: [string, string][] = [
+      ['bias (b)', n.bias.toFixed(3)],
       ['pre-act (z)', active ? n.z.toFixed(3) : '—'],
       ['post-act (a)', active ? n.a.toFixed(3) : '—'],
       ['activation', network.layers[layer - 1].activation],
@@ -247,7 +248,9 @@ export function App() {
       const prev = prevAct[wi];
       return [
         `w${wi + 1} · a_prev${wi + 1}`,
-        `${w.toFixed(2)} · ${active ? prev.toFixed(2) : '—'}`,
+        active
+          ? `${w.toFixed(2)} · ${prev.toFixed(2)} = ${(w * prev).toFixed(3)}`
+          : `${w.toFixed(2)} · — `,
       ];
     });
     return {

@@ -271,7 +271,9 @@ export function App() {
       const prev = prevAct[wi];
       return [
         `w${wi + 1} · a_prev${wi + 1}`,
-        `${w.toFixed(2)} · ${active ? prev.toFixed(2) : '—'}`,
+        active
+          ? `${w.toFixed(2)} · ${prev.toFixed(2)} = ${(w * prev).toFixed(3)}`
+          : `${w.toFixed(2)} · — `,
       ];
     });
     return {
