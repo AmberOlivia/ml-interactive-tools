@@ -442,8 +442,7 @@ export function App() {
         <div className="narrow-panel-body">
           <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
             x₀ = 1 is the <b>bias baseline</b> (from your course notes).
-            Its weights act as θ₀. x₁, x₂ come from the data; the rest
-            are engineered features.
+            Its weights act as θ₀. x₁ and x₂ come from the data.
           </div>
           <div className="feature-grid">
             {FEATURE_NAMES.map((f) => (

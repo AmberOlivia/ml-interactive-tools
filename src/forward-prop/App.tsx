@@ -357,9 +357,8 @@ export function App() {
             <h3>Input features</h3>
             <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
               x₀ = 1 is the <b>bias baseline</b> (as in your course
-              notes). Its weights into the next layer act as θ₀. x₁, x₂
-              come from the data; the rest are engineered features built
-              from x₁ and x₂.
+              notes). Its weights into the next layer act as θ₀. x₁
+              and x₂ come from the data.
             </div>
             <div className="feature-grid">
               {FEATURE_NAMES.map((f) => (
